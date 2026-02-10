@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Lead {
+  id            String     @id @default(uuid())
+  name          String?
+  phone         String     @unique
+  stage         String     @default("Novos")
+  status        String     @default("new")
+  treatment     String?
+  botStep       String     @default("start")
+  botData       Json       @default("{}")
+  lastMessageAt DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  followups     Followup[]
+  messages      Message[]
+
+  @@index([phone])
+  @@index([stage])
+  @@index([lastMessageAt])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  leadId    String
+  from      String
+  text      String
+  createdAt DateTime @default(now())
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([createdAt])
+}
+
+model Followup {
+  id        String    @id @default(uuid())
+  leadId    String
+  runAt     DateTime
+  status    String    @default("pending")
+  message   String?
+  createdAt DateTime  @default(now())
+  sentAt    DateTime?
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([runAt])
+  @@index([status])
+}
