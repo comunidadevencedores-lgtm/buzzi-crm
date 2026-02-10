@@ -10,7 +10,7 @@ interface SendMessageParams {
   text: string
 }
 
-export async function sendTextMessage({ phone, text }: SendMessageParams) {
+export async function sendTextMessage(phone: string, text: string) {
   try {
     console.log('🔍 DEBUG sendTextMessage:')
     console.log('  📞 Phone:', phone)
