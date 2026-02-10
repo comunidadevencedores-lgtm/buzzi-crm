@@ -1,5 +1,6 @@
 // lib/whatsapp.ts
 // Integracao com Z-API (WhatsApp)
+
 import axios from "axios"
 
 const ZAPI_BASE_URL = process.env.WHATSAPP_API_URL
@@ -20,7 +21,9 @@ export async function sendTextMessage(phone: string, text: string) {
     }
 
     if (!ZAPI_BASE_URL || !ZAPI_TOKEN || !ZAPI_INSTANCE_ID || !ZAPI_CLIENT_TOKEN) {
-      throw new Error("❌ Variáveis Z-API não configuradas (falta URL/TOKEN/INSTANCE_ID/CLIENT_TOKEN)")
+      throw new Error(
+        "❌ Variáveis Z-API não configuradas (falta WHATSAPP_API_URL / WHATSAPP_API_TOKEN / WHATSAPP_INSTANCE_ID / WHATSAPP_CLIENT_TOKEN)"
+      )
     }
 
     const url = `${ZAPI_BASE_URL}/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`
@@ -40,7 +43,6 @@ export async function sendTextMessage(phone: string, text: string) {
     })
 
     console.log("✅ Resposta Z-API:", response.data)
-
     return response.data
   } catch (error: any) {
     console.error(
@@ -53,9 +55,7 @@ export async function sendTextMessage(phone: string, text: string) {
 
 export function normalizePhone(phone: string): string {
   const cleaned = phone.replace(/\D/g, "")
-  if (cleaned.startsWith("55")) {
-    return cleaned
-  }
+  if (cleaned.startsWith("55")) return cleaned
   return `55${cleaned}`
 }
 
@@ -68,6 +68,7 @@ export interface IncomingMessage {
 
 /**
  * Extrai o texto da mensagem conforme o formato Z-API (e fallbacks).
+ * Z-API: text.message, hydratedTemplate.message, buttonsResponseMessage.message, listResponseMessage.message, image.caption, etc.
  */
 function extractText(body: any): string | null {
   if (body.text?.message) return body.text.message
@@ -77,12 +78,15 @@ function extractText(body: any): string | null {
   if (body.image?.caption) return body.image.caption
   if (body.video?.caption) return body.video.caption
   if (body.document?.caption) return body.document.caption
+
+  // Reação: pode tratar como texto fixo ou ignorar
   if (body.reaction?.value) return `[Reação: ${body.reaction.value}]`
 
   // Fallback formato Evolution/Baileys
   const data = body.data
   if (data?.message?.conversation) return data.message.conversation
-  if (data?.message?.extendedTextMessage?.text) return data.message.extendedTextMessage.text
+  if (data?.message?.extendedTextMessage?.text)
+    return data.message.extendedTextMessage.text
 
   return null
 }
