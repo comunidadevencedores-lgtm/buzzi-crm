@@ -1,5 +1,5 @@
 // lib/whatsapp.ts
-// Integracao com Z-API (WhatsApp)
+// Integracao com Z-API 
 
 import axios from "axios"
 
