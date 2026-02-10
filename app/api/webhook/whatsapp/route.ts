@@ -76,10 +76,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Envia a resposta pelo WhatsApp
-    await sendTextMessage({
-      phone,
-      text: botResponse.replyText,
-    })
+   await sendTextMessage(phone, botResponse.replyText)
 
     console.log('✅ Mensagem processada com sucesso!')
 
