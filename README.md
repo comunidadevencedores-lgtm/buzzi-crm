@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🦷 Buzzi CRM - Sistema de WhatsApp com Bot
 
 Sistema completo de CRM com integração WhatsApp, bot de triagem automática e painel Kanban.
@@ -197,3 +198,7 @@ npm run db:studio    # Abre Prisma Studio
 **Criado por:** Sistema Buzzi CRM
 **Versão:** 1.0.0
 **Data:** 2025
+=======
+# buzzi-crm
+buzzi-crm
+>>>>>>> 9a4380c465b04631ea2592b991748eacc760be1b
