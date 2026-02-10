@@ -1,4 +1,3 @@
-// Bot de triagem - Máquina de estados
 import { Lead, Prisma } from '@prisma/client'
 
 export type BotStep = 
