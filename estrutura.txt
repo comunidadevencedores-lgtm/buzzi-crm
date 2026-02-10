@@ -1,0 +1,33 @@
+Listagem de caminhos de pasta
+O n£mero de s‚rie do volume ‚ 00000054 6C2F:F504
+C:\USERS\ANDRADE\NOVA PASTA\BUZZI-CRM\APP
+³   globals.css
+³   layout.tsx
+³   page.tsx
+³   
+ÃÄÄÄadmin
+³   ÃÄÄÄkanban
+³   ³       page.tsx
+³   ³       
+³   ÀÄÄÄleads
+³       ÀÄÄÄ[id]
+³               page.tsx
+³               
+ÀÄÄÄapi
+    ÃÄÄÄleads
+    ³   ³   route.ts
+    ³   ³   
+    ³   ÀÄÄÄ[id]
+    ³       ³   route.ts
+    ³       ³   
+    ³       ÀÄÄÄstage
+    ³               route.ts
+    ³               
+    ÃÄÄÄwebhook
+    ³   ÀÄÄÄwhatsapp
+    ³           route.ts
+    ³           
+    ÀÄÄÄwhatsapp
+        ÀÄÄÄsend
+                route.ts
+                
