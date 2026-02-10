@@ -37,9 +37,9 @@ export async function sendTextMessage(phone: string, text: string) {
 
     const response = await axios.post(url, payload, {
       headers: {
-        "Content-Type": "application/json",
-        "client-token": ZAPI_CLIENT_TOKEN,
-      },
+  "Content-Type": "application/json",
+  "Client-Token": ZAPI_CLIENT_TOKEN,
+}
     })
 
     console.log("✅ Resposta Z-API:", response.data)
