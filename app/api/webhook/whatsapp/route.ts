@@ -1,82 +1,99 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { parseIncomingWebhook, sendTextMessage } from "@/lib/whatsapp";
-import { generateAIResponse } from "@/lib/ai-bot";
+// Webhook que recebe mensagens do WhatsApp - COM IA
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { parseIncomingWebhook, sendTextMessage } from '@/lib/evolution'
+import { processMessage } from '@/lib/bot'
 
-const prisma = new PrismaClient();
-
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json();
+    const body = await request.json()
     
-    // 1. Usa sua função do lib/whatsapp.ts para validar e limpar os dados da Z-API
-    const incoming = parseIncomingWebhook(body);
+    console.log('📩 Webhook recebido:', JSON.stringify(body, null, 2))
+
+    // Parse da mensagem
+    const incomingMessage = parseIncomingWebhook(body)
     
-    // Se a função retornar null (ex: mensagem enviada por você ou erro de formato), encerra
-    if (!incoming) {
-      return NextResponse.json({ ok: true });
+    if (!incomingMessage) {
+      console.log('⚠️ Mensagem ignorada (formato inválido ou mensagem própria)')
+      return NextResponse.json({ ok: true })
     }
 
-    const { phone, text } = incoming;
+    const { phone, text, messageId } = incomingMessage
 
-    // 2. Banco de Dados: Localizar ou criar o Lead pelo número de telefone
-    let lead = await prisma.lead.findFirst({
-      where: { phone: phone }
-    });
+    // Busca ou cria o Lead
+    let lead = await prisma.lead.findUnique({
+      where: { phone },
+    })
 
     if (!lead) {
+      console.log('🆕 Criando novo lead:', phone)
       lead = await prisma.lead.create({
-        data: { 
-          phone: phone, 
-          name: "Novo Contato WhatsApp" 
-        }
-      });
+        data: {
+          phone,
+          stage: 'Novos',
+          status: 'new',
+          botStep: 'start',
+          botData: {},
+        },
+      })
     }
 
-    // 3. Salvar a mensagem que o cliente acabou de enviar
+    // Salva a mensagem do cliente
     await prisma.message.create({
-      data: { 
-        leadId: lead.id, 
-        text: text, 
-        from: "client" 
-      }
-    });
+      data: {
+        leadId: lead.id,
+        from: 'client',
+        text,
+      },
+    })
 
-    // 4. Buscar histórico (últimas 5 mensagens) para dar contexto à IA
-    const historyData = await prisma.message.findMany({
-      where: { leadId: lead.id },
-      take: 5,
-      orderBy: { createdAt: 'desc' }
-    });
+    // Atualiza última mensagem
+    await prisma.lead.update({
+      where: { id: lead.id },
+      data: { lastMessageAt: new Date() },
+    })
 
-    // Inverte para ficar na ordem cronológica (mais antiga para mais recente)
-    const formattedHistory = historyData.reverse().map(m => ({
-      role: (m.from === "client" ? "user" : "assistant") as "user" | "assistant",
-      content: m.text
-    }));
-
-    // 5. Gerar a resposta usando a OpenAI (seu arquivo lib/ai-bot.ts)
-    const aiResponse = await generateAIResponse(text, formattedHistory);
-
-    // 6. Se a IA gerou uma resposta válida, salva no banco e envia ao cliente
-    if (aiResponse) {
-      // Salva a resposta do bot no banco de dados
-      await prisma.message.create({
-        data: { 
-          leadId: lead.id, 
-          text: aiResponse, 
-          from: "bot" 
-        }
-      });
-
-      // ENVIAR PARA Z-API: Usa a função que você já tem no lib/whatsapp.ts
-      // Ela já utiliza os tokens e instâncias configurados na Vercel!
-      await sendTextMessage(phone, aiResponse);
+    // VERIFICA SE O BOT ESTÁ PAUSADO (humano assumiu)
+    if (lead.botStep === 'paused') {
+      console.log('⏸️ Bot pausado - mensagem não será respondida automaticamente')
+      return NextResponse.json({ ok: true, botPaused: true })
     }
 
-    return NextResponse.json({ ok: true });
-  } catch (error: any) {
-    console.error("❌ Erro fatal no Webhook:", error.message);
-    return NextResponse.json({ error: "Erro interno no servidor" }, { status: 500 });
+    // Processa a mensagem pelo bot (usa o bot simples por enquanto)
+    console.log('🤖 Processando com bot...')
+    const botResponse = processMessage(lead, text)
+
+    console.log('✅ Resposta do bot gerada:', botResponse.replyText)
+
+    // Atualiza o lead com as mudanças do bot
+    if (Object.keys(botResponse.leadUpdates).length > 0) {
+      await prisma.lead.update({
+        where: { id: lead.id },
+        data: botResponse.leadUpdates,
+      })
+      console.log('📝 Lead atualizado')
+    }
+    
+    // Salva a resposta do bot
+    await prisma.message.create({
+      data: {
+        leadId: lead.id,
+        from: 'bot',
+        text: botResponse.replyText,
+      },
+    })
+
+    // Envia a resposta pelo WhatsApp
+    console.log('📤 Enviando resposta para WhatsApp...')
+    await sendTextMessage({ phone, text: botResponse.replyText })
+    console.log('✅ Mensagem enviada com sucesso!')
+
+    return NextResponse.json({ ok: true })
+  } catch (error) {
+    console.error('❌ Erro no webhook:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
