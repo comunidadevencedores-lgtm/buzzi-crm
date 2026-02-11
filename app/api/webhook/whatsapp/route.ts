@@ -1,90 +1,74 @@
-// Webhook que recebe mensagens do WhatsApp
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { parseIncomingWebhook, sendTextMessage } from '@/lib/evolution'
-import { processMessage } from '@/lib/bot'
+import { NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import { generateAIResponse } from "@/lib/ai-bot";
+import axios from "axios";
 
-export async function POST(request: NextRequest) {
+const prisma = new PrismaClient();
+
+export async function POST(req: Request) {
   try {
-    const body = await request.json()
-    
-    console.log('📩 Webhook recebido:', JSON.stringify(body, null, 2))
+    const body = await req.json();
 
-    // Parse da mensagem
-    const incomingMessage = parseIncomingWebhook(body)
-    
-    if (!incomingMessage) {
-      console.log('⚠️ Mensagem ignorada (formato inválido ou mensagem própria)')
-      return NextResponse.json({ ok: true })
-    }
+    // Bloqueia loop: se a mensagem veio de nós, ignora
+    if (body.fromMe === true) return NextResponse.json({ ok: true });
 
-    const { phone, text, messageId } = incomingMessage
+    const phone = body.phone;
+    // Ajuste para capturar o texto correto vindo da Z-API
+    const text = body.text?.message || body.text; 
 
-    // Busca ou cria o Lead
-    let lead = await prisma.lead.findUnique({
-      where: { phone },
-    })
+    if (!phone || !text) return NextResponse.json({ ok: true });
+
+    // 1. Localizar ou criar o Lead
+    let lead = await prisma.lead.findFirst({
+      where: { phone: String(phone) }
+    });
 
     if (!lead) {
-      console.log('🆕 Criando novo lead:', phone)
       lead = await prisma.lead.create({
-        data: {
-          phone,
-          stage: 'Novos',
-          status: 'new',
-          botStep: 'start',
-          botData: {},
-        },
-      })
+        data: { phone: String(phone), name: "Contato WhatsApp" }
+      });
     }
 
-    // Salva a mensagem do cliente
+    // 2. Salvar mensagem do cliente
     await prisma.message.create({
-      data: {
-        leadId: lead.id,
-        from: 'client',
-        text,
-      },
-    })
+      data: { leadId: lead.id, text: String(text), from: "client" }
+    });
 
-    // Atualiza última mensagem
-    await prisma.lead.update({
-      where: { id: lead.id },
-      data: { lastMessageAt: new Date() },
-    })
+    // 3. Buscar histórico (últimas 3 mensagens) para a IA ter contexto
+    const lastMessages = await prisma.message.findMany({
+      where: { leadId: lead.id },
+      take: 3,
+      orderBy: { createdAt: 'desc' }
+    });
 
-    // Processa a mensagem pelo bot
-    const botResponse = processMessage(lead, text)
+    const history = lastMessages.reverse().map(m => ({
+      role: (m.from === "client" ? "user" : "assistant") as "user" | "assistant",
+      content: m.text
+    }));
 
-    // Atualiza o lead com as mudanças do bot
-    if (Object.keys(botResponse.leadUpdates).length > 0) {
-      await prisma.lead.update({
-        where: { id: lead.id },
-        data: botResponse.leadUpdates,
-      })
+    // 4. Gerar resposta com IA
+    const aiResponse = await generateAIResponse(String(text), history);
+
+    if (aiResponse) {
+      // 5. Salvar resposta da IA no banco
+      await prisma.message.create({
+        data: { leadId: lead.id, text: aiResponse, from: "bot" }
+      });
+
+      // 6. Enviar para Z-API usando as variáveis da Vercel
+      const instance = process.env.ZAPI_INSTANCE;
+      const token = process.env.ZAPI_TOKEN;
+      const zApiUrl = `https://api.z-api.io/instances/${instance}/token/${token}/send-text`;
+      
+      await axios.post(zApiUrl, {
+        phone: phone,
+        message: aiResponse
+      });
     }
-    
-    
 
-    // Salva a resposta do bot
-    await prisma.message.create({
-      data: {
-        leadId: lead.id,
-        from: 'bot',
-        text: botResponse.replyText,
-      },
-    })
-
-    // Envia a resposta pelo WhatsApp
-await sendTextMessage({ phone, text: botResponse.replyText })
-    console.log('✅ Mensagem processada com sucesso!')
-
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error('❌ Erro no webhook:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error("Erro no Webhook:", error);
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 });
   }
 }
