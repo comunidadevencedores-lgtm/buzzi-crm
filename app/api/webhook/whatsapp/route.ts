@@ -56,8 +56,9 @@ export async function POST(req: Request) {
       });
 
       // 6. Enviar para Z-API usando as variáveis da Vercel
-      const instance = process.env.ZAPI_INSTANCE;
-      const token = process.env.ZAPI_TOKEN;
+     // Use os nomes exatos que aparecem no seu print da Vercel
+      const instance = process.env.WHATSAPP_INSTANCE_ID;
+      const token = process.env.WHATSAPP_API_TOKEN;
       const zApiUrl = `https://api.z-api.io/instances/${instance}/token/${token}/send-text`;
       
       await axios.post(zApiUrl, {
