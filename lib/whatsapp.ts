@@ -103,23 +103,45 @@ function extractPhone(body: any): string | null {
 
 export function parseIncomingWebhook(body: any): IncomingMessage | null {
   try {
-    // Z-API: ignorar mensagens enviadas por nós
-    if (body.fromMe === true) return null
+    console.log("🔎 DEBUG BODY:", JSON.stringify(body, null, 2))
 
-    const phone = extractPhone(body)
-    const text = extractText(body)
-    const messageId = body.messageId || body.data?.key?.id || `msg_${Date.now()}`
-    const timestamp = body.momment ?? body.timestamp ?? Date.now()
+    // 🔹 Detecta fromMe corretamente (Z-API + Evolution)
+    const fromMe =
+      body.fromMe === true ||
+      body.data?.key?.fromMe === true
+
+    if (fromMe) return null
+
+    // 🔹 Extrai telefone corretamente
+    const phone =
+      body.phone ||
+      body.participantPhone ||
+      body.data?.key?.remoteJid?.split("@")[0]
+
+    // 🔹 Extrai texto corretamente
+    const text =
+      body.text?.message ||
+      body.data?.message?.conversation ||
+      body.data?.message?.extendedTextMessage?.text ||
+      body.message?.conversation ||
+      null
 
     if (!phone || !text || String(text).trim() === "") {
+      console.log("⚠️ Mensagem ignorada:", { phone, text })
       return null
     }
 
     return {
       phone: normalizePhone(String(phone)),
       text: String(text).trim(),
-      messageId: String(messageId),
-      timestamp: Number(timestamp),
+      messageId:
+        body.messageId ||
+        body.data?.key?.id ||
+        `msg_${Date.now()}`,
+      timestamp:
+        body.timestamp ||
+        body.data?.messageTimestamp ||
+        Date.now(),
     }
   } catch (error) {
     console.error("Erro ao parsear webhook:", error)
