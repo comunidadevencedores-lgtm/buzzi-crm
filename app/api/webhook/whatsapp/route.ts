@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       data: { leadId: lead.id, from: 'bot', text: botResponse.replyText }
     })
 
-    await sendTextMessage({ phone, text: botResponse.replyText })
+    await sendTextMessage(phone, botResponse.replyText)
 
     return NextResponse.json({ ok: true })
   } catch (error: any) {
