@@ -1,70 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { parseIncomingWebhook, sendTextMessage } from '@/lib/whatsapp'
-import { processMessage } from '@/lib/bot'
+import { sendTextMessage } from '@/lib/whatsapp'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    console.log('📩 Webhook recebido:', JSON.stringify(body, null, 2))
+    const { leadId, text } = await request.json()
 
-    const incomingMessage = parseIncomingWebhook(body)
-    if (!incomingMessage) {
-      console.log('⚠️ Mensagem ignorada')
-      return NextResponse.json({ ok: true })
+    if (!leadId || !text?.trim()) {
+      return NextResponse.json({ error: 'leadId e text são obrigatórios' }, { status: 400 })
     }
 
-    const { phone, text } = incomingMessage
-    console.log('📞 Phone:', phone, '💬 Text:', text)
-
-    let lead = await prisma.lead.findUnique({ where: { phone } })
-
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } })
     if (!lead) {
-      lead = await prisma.lead.create({
-        data: {
-          phone,
-          stage: 'Novos',
-          status: 'new',
-          botStep: 'start',
-          botData: {},
-        }
-      })
+      return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
     }
 
+    // Salva mensagem como 'agent' (atendente humano)
     await prisma.message.create({
-      data: { leadId: lead.id, from: 'client', text }
+      data: { leadId: lead.id, from: 'agent', text: text.trim() }
     })
 
+    // Envia pelo WhatsApp
+    await sendTextMessage(lead.phone, text.trim())
+
+    // Atualiza última mensagem
     await prisma.lead.update({
       where: { id: lead.id },
       data: { lastMessageAt: new Date() }
     })
 
-    if (lead.botStep === 'paused') {
-      return NextResponse.json({ ok: true })
-    }
-
-    const botResponse = processMessage(lead, text)
-    console.log('🤖 Resposta:', botResponse.replyText)
-
-    if (Object.keys(botResponse.leadUpdates).length > 0) {
-      await prisma.lead.update({
-        where: { id: lead.id },
-        data: botResponse.leadUpdates,
-      })
-    }
-
-    await prisma.message.create({
-      data: { leadId: lead.id, from: 'bot', text: botResponse.replyText }
-    })
-
-    await sendTextMessage(phone, botResponse.replyText)
-
-    console.log('✅ Mensagem processada!')
+    console.log('✅ Mensagem manual enviada para:', lead.phone)
     return NextResponse.json({ ok: true })
 
   } catch (error: any) {
-    console.error('❌ Erro no webhook:', error.message)
+    console.error('❌ Erro ao enviar mensagem manual:', error.message)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }
