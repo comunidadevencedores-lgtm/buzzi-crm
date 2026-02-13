@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseIncomingWebhook, sendTextMessage } from '@/lib/whatsapp'
-
 import { generateAIResponse } from '@/lib/ai-bot'
-
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,51 +41,8 @@ export async function POST(request: NextRequest) {
     })
 
     if (lead.botStep === 'paused') {
+      console.log('⏸️ Bot pausado')
       return NextResponse.json({ ok: true })
     }
 
-    // Buscar histórico das últimas mensagens (opcional mas recomendado)
-const historyMessages = await prisma.message.findMany({
-  where: { leadId: lead.id },
-  orderBy: { createdAt: 'asc' },
-  take: 10,
-})
-
-const history = historyMessages.map(m => ({
-  role: m.from === 'bot' ? 'assistant' : 'user',
-  content: m.text
-}))
-console.log("🔥🔥🔥 ESTÁ USANDO IA AGORA 🔥🔥🔥")
-
-// 🔥 Gera resposta com IA
-const aiReply = await generateAIResponse(text, history)
-
-const botResponse = {
-  replyText: aiReply,
-  leadUpdates: {}
-}
-
-    console.log('🤖 Resposta:', botResponse.replyText)
-
-    if (Object.keys(botResponse.leadUpdates).length > 0) {
-      await prisma.lead.update({
-        where: { id: lead.id },
-        data: botResponse.leadUpdates,
-      })
-    }
-
-    await prisma.message.create({
-      data: { leadId: lead.id, from: 'bot', text: botResponse.replyText }
-    })
-
-    await sendTextMessage(phone, botResponse.replyText)
-
-    console.log('✅ Mensagem processada!')
-    return NextResponse.json({ ok: true })
-
-  
-    } catch (error: any) {
-  console.error('❌ ERRO COMPLETO:', error)
-  return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
-}
-
+    const historyMessages = await prisma.message.findMa
