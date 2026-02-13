@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseIncomingWebhook, sendTextMessage } from '@/lib/whatsapp'
-import { processMessage } from '@/lib/bot'
+
 import { generateAIResponse } from '@/lib/ai-bot'
 
 
