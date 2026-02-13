@@ -84,8 +84,9 @@ const botResponse = {
     console.log('✅ Mensagem processada!')
     return NextResponse.json({ ok: true })
 
-  } catch (error: any) {
-    console.error('❌ Erro no webhook:', error.message)
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
-  }
+  
+    } catch (error: any) {
+  console.error('❌ ERRO COMPLETO:', error)
+  return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
 }
+
