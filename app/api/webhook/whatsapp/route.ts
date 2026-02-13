@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseIncomingWebhook, sendTextMessage } from '@/lib/whatsapp'
 import { processMessage } from '@/lib/bot'
+import { generateAIResponse } from '@/lib/ai-bot'
+
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,7 +46,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    const botResponse = processMessage(lead, text)
+    // Buscar histórico das últimas mensagens (opcional mas recomendado)
+const historyMessages = await prisma.message.findMany({
+  where: { leadId: lead.id },
+  orderBy: { createdAt: 'asc' },
+  take: 10,
+})
+
+const history = historyMessages.map(m => ({
+  role: m.from === 'bot' ? 'assistant' : 'user',
+  content: m.text
+}))
+
+// 🔥 Gera resposta com IA
+const aiReply = await generateAIResponse(text, history)
+
+const botResponse = {
+  replyText: aiReply,
+  leadUpdates: {}
+}
+
     console.log('🤖 Resposta:', botResponse.replyText)
 
     if (Object.keys(botResponse.leadUpdates).length > 0) {
