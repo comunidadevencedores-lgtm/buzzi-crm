@@ -57,6 +57,7 @@ const history = historyMessages.map(m => ({
   role: m.from === 'bot' ? 'assistant' : 'user',
   content: m.text
 }))
+console.log("🔥🔥🔥 ESTÁ USANDO IA AGORA 🔥🔥🔥")
 
 // 🔥 Gera resposta com IA
 const aiReply = await generateAIResponse(text, history)
