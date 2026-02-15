@@ -1,61 +1,49 @@
-// lib/whatsapp.ts
-// Integracao com Z-API 
+// lib/whatsapp.ts - API Oficial do Meta
 
-import axios from "axios"
-
-const ZAPI_BASE_URL = process.env.WHATSAPP_API_URL
-const ZAPI_TOKEN = process.env.WHATSAPP_API_TOKEN
-const ZAPI_INSTANCE_ID = process.env.WHATSAPP_INSTANCE_ID
-const ZAPI_CLIENT_TOKEN = process.env.WHATSAPP_CLIENT_TOKEN
+const META_TOKEN = process.env.META_WHATSAPP_TOKEN
+const META_PHONE_ID = process.env.META_PHONE_NUMBER_ID
+const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'buzzi123'
 
 export async function sendTextMessage(phone: string, text: string) {
   try {
-    console.log("🔍 DEBUG sendTextMessage:")
-    console.log("  📞 Phone:", phone)
-    console.log("  💬 Text:", text)
-    console.log("  📏 Text length:", text?.length)
-    console.log("  ❓ Text is empty?", !text || text.trim() === "")
+    if (!text || text.trim() === '') throw new Error('Texto vazio!')
+    if (!META_TOKEN || !META_PHONE_ID) throw new Error('Variáveis META não configuradas!')
 
-    if (!text || text.trim() === "") {
-      throw new Error("❌ Texto da mensagem está vazio!")
-    }
-
-    if (!ZAPI_BASE_URL || !ZAPI_TOKEN || !ZAPI_INSTANCE_ID || !ZAPI_CLIENT_TOKEN) {
-      throw new Error(
-        "❌ Variáveis Z-API não configuradas (falta WHATSAPP_API_URL / WHATSAPP_API_TOKEN / WHATSAPP_INSTANCE_ID / WHATSAPP_CLIENT_TOKEN)"
-      )
-    }
-
-    const url = `${ZAPI_BASE_URL}/instances/${ZAPI_INSTANCE_ID}/token/${ZAPI_TOKEN}/send-text`
+    const url = `https://graph.facebook.com/v22.0/${META_PHONE_ID}/messages`
 
     const payload = {
-      phone: normalizePhone(phone),
-      message: text,
+      messaging_product: 'whatsapp',
+      to: normalizePhone(phone),
+      type: 'text',
+      text: { body: text }
     }
 
-    console.log("📤 Enviando para Z-API:", payload)
+    console.log('📤 Enviando para Meta API:', payload)
 
-    const response = await axios.post(url, payload, {
+    const response = await fetch(url, {
+      method: 'POST',
       headers: {
-  "Content-Type": "application/json",
-  "Client-Token": ZAPI_CLIENT_TOKEN,
-}
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${META_TOKEN}`
+      },
+      body: JSON.stringify(payload)
     })
 
-    console.log("✅ Resposta Z-API:", response.data)
-    return response.data
+    const data = await response.json()
+    if (!response.ok) throw new Error(JSON.stringify(data))
+
+    console.log('✅ Resposta Meta API:', data)
+    return data
+
   } catch (error: any) {
-    console.error(
-      "❌ Erro ao enviar mensagem Z-API:",
-      error.response?.data || error.message
-    )
+    console.error('❌ Erro ao enviar Meta API:', error.message)
     throw error
   }
 }
 
 export function normalizePhone(phone: string): string {
-  const cleaned = phone.replace(/\D/g, "")
-  if (cleaned.startsWith("55")) return cleaned
+  const cleaned = phone.replace(/\D/g, '')
+  if (cleaned.startsWith('55')) return cleaned
   return `55${cleaned}`
 }
 
@@ -66,85 +54,38 @@ export interface IncomingMessage {
   timestamp: number
 }
 
-/**
- * Extrai o texto da mensagem conforme o formato Z-API (e fallbacks).
- * Z-API: text.message, hydratedTemplate.message, buttonsResponseMessage.message, listResponseMessage.message, image.caption, etc.
- */
-function extractText(body: any): string | null {
-  if (body.text?.message) return body.text.message
-  if (body.hydratedTemplate?.message) return body.hydratedTemplate.message
-  if (body.buttonsResponseMessage?.message) return body.buttonsResponseMessage.message
-  if (body.listResponseMessage?.message) return body.listResponseMessage.message
-  if (body.image?.caption) return body.image.caption
-  if (body.video?.caption) return body.video.caption
-  if (body.document?.caption) return body.document.caption
-
-  // Reação: pode tratar como texto fixo ou ignorar
-  if (body.reaction?.value) return `[Reação: ${body.reaction.value}]`
-
-  // Fallback formato Evolution/Baileys
-  const data = body.data
-  if (data?.message?.conversation) return data.message.conversation
-  if (data?.message?.extendedTextMessage?.text)
-    return data.message.extendedTextMessage.text
-
-  return null
-}
-
-/**
- * Extrai o número de quem enviou (Z-API: phone; em grupo use participantPhone).
- */
-function extractPhone(body: any): string | null {
-  const isGroup = body.isGroup === true
-  const phone = isGroup ? body.participantPhone : body.phone
-  const fallback = body.phone || body.data?.key?.remoteJid?.split("@")[0]
-  return phone || fallback || null
-}
-
 export function parseIncomingWebhook(body: any): IncomingMessage | null {
   try {
-    console.log("🔎 DEBUG BODY:", JSON.stringify(body, null, 2))
+    console.log('🔎 DEBUG BODY:', JSON.stringify(body, null, 2))
 
-    // 🔹 Detecta fromMe corretamente (Z-API + Evolution)
-    const fromMe =
-      body.fromMe === true ||
-      body.data?.key?.fromMe === true
+    // Formato API Oficial Meta
+    const entry = body?.entry?.[0]
+    const changes = entry?.changes?.[0]
+    const value = changes?.value
+    const message = value?.messages?.[0]
 
-    if (fromMe) return null
+    if (!message) return null
 
-    // 🔹 Extrai telefone corretamente
-    const phone =
-      body.phone ||
-      body.participantPhone ||
-      body.data?.key?.remoteJid?.split("@")[0]
+    // Ignora mensagens enviadas pelo bot
+    if (message.from === META_PHONE_ID) return null
 
-    // 🔹 Extrai texto corretamente
-    const text =
-      body.text?.message ||
-      body.data?.message?.conversation ||
-      body.data?.message?.extendedTextMessage?.text ||
-      body.message?.conversation ||
-      null
+    const phone = message.from
+    const text = message?.text?.body || null
 
-    if (!phone || !text || String(text).trim() === "") {
-      console.log("⚠️ Mensagem ignorada:", { phone, text })
+    if (!phone || !text || text.trim() === '') {
+      console.log('⚠️ Mensagem ignorada:', { phone, text })
       return null
     }
 
     return {
       phone: normalizePhone(String(phone)),
       text: String(text).trim(),
-      messageId:
-        body.messageId ||
-        body.data?.key?.id ||
-        `msg_${Date.now()}`,
-      timestamp:
-        body.timestamp ||
-        body.data?.messageTimestamp ||
-        Date.now(),
+      messageId: message.id || `msg_${Date.now()}`,
+      timestamp: message.timestamp || Date.now(),
     }
+
   } catch (error) {
-    console.error("Erro ao parsear webhook:", error)
+    console.error('Erro ao parsear webhook Meta:', error)
     return null
   }
 }
