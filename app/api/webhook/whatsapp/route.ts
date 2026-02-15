@@ -10,15 +10,12 @@ export async function POST(request: NextRequest) {
 
     const incomingMessage = parseIncomingWebhook(body)
     if (!incomingMessage) {
-      console.log('⚠️ Mensagem ignorada')
       return NextResponse.json({ ok: true })
     }
 
     const { phone, text } = incomingMessage
-    console.log('📞 Phone:', phone, '💬 Text:', text)
 
     let lead = await prisma.lead.findUnique({ where: { phone } })
-
     if (!lead) {
       lead = await prisma.lead.create({
         data: {
@@ -41,8 +38,33 @@ export async function POST(request: NextRequest) {
     })
 
     if (lead.botStep === 'paused') {
-      console.log('⏸️ Bot pausado')
       return NextResponse.json({ ok: true })
     }
 
-    const historyMessages = await prisma.message.findMa
+    const historyMessages = await prisma.message.findMany({
+      where: { leadId: lead.id },
+      orderBy: { createdAt: 'asc' },
+      take: 10,
+    })
+
+    const history = historyMessages.map(m => ({
+      role: (m.from === 'bot' ? 'assistant' : 'user') as 'user' | 'assistant',
+      content: m.text
+    }))
+
+    const aiReply = await generateAIResponse(text, history)
+
+    await prisma.message.create({
+      data: { leadId: lead.id, from: 'bot', text: aiReply }
+    })
+
+    await sendTextMessage(phone, aiReply)
+
+    console.log('✅ Mensagem processada!')
+    return NextResponse.json({ ok: true })
+
+  } catch (error: any) {
+    console.error('❌ ERRO:', error.message)
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+  }
+}
