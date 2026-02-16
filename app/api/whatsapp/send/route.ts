@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { sendTextMessage } from '@/lib/whatsapp'
 
 export async function POST(request: NextRequest) {
-  try {
+  try { 
     const { leadId, text } = await request.json()
 
     if (!leadId || !text?.trim()) {
