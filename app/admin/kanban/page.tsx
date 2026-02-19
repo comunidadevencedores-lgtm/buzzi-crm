@@ -22,6 +22,13 @@ interface Message {
   createdAt: string;
 }
 
+interface Message {
+  id: string;
+  from: "client" | "bot" | "team";
+  text: string;
+  createdAt: string;
+}
+
 interface Lead {
   id: string;
   phone: string;
@@ -33,8 +40,9 @@ interface Lead {
   botData: Record<string, any> | null;
   lastMessageAt: string;
   createdAt: string;
-  _count?: { messages: number };
-  lastMessage?: string;
+  lastMessage?: string | null;
+  lastMessageFrom?: string | null;
+  messages?: Message[];
   unreadCount?: number;
 }
 
@@ -202,46 +210,26 @@ function ChatPanel({
   onStageChange,
   onStatusChange,
   onToggleBot,
+  onRefresh,
 }: {
   lead: Lead;
   onClose: () => void;
   onStageChange: (stage: Stage) => void;
   onStatusChange: (status: Status) => void;
   onToggleBot: () => void;
+  onRefresh: () => void;
 }) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Mensagens vêm direto do lead (já carregadas pelo polling de /api/leads)
+  const messages = lead.messages ?? [];
+  const loading = false;
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const paused = lead.botStep === "paused";
 
-  // Fetch messages
-  const fetchMessages = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/messages/${lead.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [lead.id]);
-
-  useEffect(() => {
-    setLoading(true);
-    setMessages([]);
-    fetchMessages();
-    const interval = setInterval(fetchMessages, 5000); // poll every 5s
-    return () => clearInterval(interval);
-  }, [fetchMessages]);
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages.length, lead.id]);
 
   const handleSend = async () => {
     if (!text.trim() || sending) return;
@@ -254,7 +242,7 @@ function ChatPanel({
       });
       if (res.ok) {
         setText("");
-        fetchMessages();
+        onRefresh(); // força atualização do polling
       }
     } catch (e) {
       console.error(e);
@@ -621,6 +609,7 @@ export default function KanbanPage() {
               onStageChange={handleStageChange}
               onStatusChange={handleStatusChange}
               onToggleBot={handleToggleBot}
+              onRefresh={fetchLeads}
             />
           </div>
         )}
