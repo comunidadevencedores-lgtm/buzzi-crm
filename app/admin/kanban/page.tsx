@@ -31,17 +31,20 @@ export default function KanbanPage() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
 
   const fetchLeads = useCallback(async () => {
-    try {
-      const res = await fetch('/api/leads')
-      const data = await res.json()
-      setLeads(data.leads || [])
-      setLastUpdate(new Date())
-    } catch (error) {
-      console.error('Erro ao buscar leads:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  try {
+    const res = await fetch('/api/leads', {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' },
+    })
+    const data = await res.json()
+    setLeads(data.leads || [])
+    setLastUpdate(new Date())
+  } catch (error) {
+    console.error('Erro ao buscar leads:', error)
+  } finally {
+    setLoading(false)
+  }
+}, [])
 
   useEffect(() => {
     fetchLeads()
