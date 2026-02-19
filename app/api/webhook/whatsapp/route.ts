@@ -148,9 +148,18 @@ export async function POST(request: NextRequest) {
       (lead.botData as Record<string, any>) ?? {}
     )
 
-    // Tenta capturar nome: primeira msg do cliente costuma ser o nome
-    if (!updatedBotData.name && lead.name) {
-      updatedBotData.name = lead.name
+    // Tenta capturar nome das mensagens do cliente
+    if (!updatedBotData.nome) {
+      // Procura padrão "meu nome é X" ou "me chamo X" nas mensagens do cliente
+      const clientMsgs = historyMessages.filter(m => m.from === 'client').map(m => m.text)
+      for (const msg of clientMsgs) {
+        const match = msg.match(/(?:meu nome [eé]|me chamo|sou o|sou a|pode me chamar de)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)/i)
+        if (match) { updatedBotData.nome = match[1]; break }
+        // Se a mensagem for só um nome (1-3 palavras, sem verbos)
+        if (/^[A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+){0,2}$/.test(msg.trim())) {
+          updatedBotData.nome = msg.trim(); break
+        }
+      }
     }
 
     // 10) Detecta se a IA confirmou os dados (sinal de qualificação)
@@ -162,15 +171,16 @@ export async function POST(request: NextRequest) {
       replyLower.includes('anotado') ||
       replyLower.includes('agendaremos')
 
-    if (confirmedData && updatedBotData.treatment && updatedBotData.time) {
-      updatedBotData.qualified = true
-    }
+    const isQualified = confirmedData && updatedBotData.treatment && updatedBotData.time
+
+    // Remove 'qualified' do botData (não precisa aparecer na UI)
+    delete updatedBotData.qualified
 
     // 11) Resolve novo stage
     const newStage = resolveStage(
       lead.stage,
-      botMessageCount + 1, // +1 pois acabamos de salvar mais uma
-      updatedBotData
+      botMessageCount + 1,
+      { ...updatedBotData, qualified: isQualified }
     )
 
     // 12) Atualiza lead com dados extraídos + novo stage
@@ -178,10 +188,12 @@ export async function POST(request: NextRequest) {
       where: { id: lead.id },
       data: {
         stage: newStage,
-        status: updatedBotData.qualified ? 'warm' : lead.status,
+        status: isQualified ? 'warm' : lead.status,
         botData: updatedBotData,
+        // Salva nome no campo oficial do lead
+        name: updatedBotData.nome ?? lead.name,
         treatment: updatedBotData.treatment ?? lead.treatment,
-        botStep: updatedBotData.qualified ? 'done' : 'collecting',
+        botStep: isQualified ? 'done' : 'collecting',
         lastMessageAt: new Date(),
       },
     })
