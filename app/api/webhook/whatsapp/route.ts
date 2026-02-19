@@ -150,14 +150,22 @@ export async function POST(request: NextRequest) {
 
     // Tenta capturar nome das mensagens do cliente
     if (!updatedBotData.nome) {
-      // Procura padrão "meu nome é X" ou "me chamo X" nas mensagens do cliente
-      const clientMsgs = historyMessages.filter(m => m.from === 'client').map(m => m.text)
+      const IGNORAR = /^(olá|ola|oi|bom dia|boa tarde|boa noite|ok|sim|não|nao|tudo bem|tá|ta|entendi|obrigado|obrigada|claro)$/i
+      const clientMsgs = historyMessages.filter(m => m.from === 'client').map(m => m.text.trim())
       for (const msg of clientMsgs) {
+        // Padrão explícito: "meu nome é X", "me chamo X"
         const match = msg.match(/(?:meu nome [eé]|me chamo|sou o|sou a|pode me chamar de)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)/i)
         if (match) { updatedBotData.nome = match[1]; break }
-        // Se a mensagem for só um nome (1-3 palavras, sem verbos)
-        if (/^[A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+){0,2}$/.test(msg.trim())) {
-          updatedBotData.nome = msg.trim(); break
+        // Mensagem curta que parece um nome (2-4 palavras, sem verbos, sem saudações)
+        const words = msg.split(' ')
+        if (
+          words.length >= 2 &&
+          words.length <= 4 &&
+          !IGNORAR.test(msg) &&
+          /^[A-ZÀ-Ú]/i.test(msg) &&
+          !/[0-9!?.,]/.test(msg)
+        ) {
+          updatedBotData.nome = msg; break
         }
       }
     }
