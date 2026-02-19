@@ -3,37 +3,34 @@ import { prisma } from '@/lib/prisma'
 import { sendTextMessage } from '@/lib/whatsapp'
 
 export async function POST(request: NextRequest) {
-  try { 
-    const { leadId, text } = await request.json()
+  try {
+    const { leadId, phone, text } = await request.json()
 
-    if (!leadId || !text?.trim()) {
-      return NextResponse.json({ error: 'leadId e text são obrigatórios' }, { status: 400 })
+    if (!leadId || !phone || !text?.trim()) {
+      return NextResponse.json({ error: 'leadId, phone e text são obrigatórios' }, { status: 400 })
     }
 
-    const lead = await prisma.lead.findUnique({ where: { id: leadId } })
-    if (!lead) {
-      return NextResponse.json({ error: 'Lead não encontrado' }, { status: 404 })
-    }
-
-    // Salva mensagem como 'agent' (atendente humano)
-    await prisma.message.create({
-      data: { leadId: lead.id, from: 'agent', text: text.trim() }
+    // 1) Salva no banco
+    const message = await prisma.message.create({
+      data: {
+        leadId,
+        from: 'bot', // ajuste para 'team' se seu enum tiver esse valor
+        text: text.trim(),
+      },
     })
 
-    // Envia pelo WhatsApp
-    await sendTextMessage(lead.phone, text.trim())
-
-    // Atualiza última mensagem
+    // 2) Atualiza lastMessageAt
     await prisma.lead.update({
-      where: { id: lead.id },
-      data: { lastMessageAt: new Date() }
+      where: { id: leadId },
+      data: { lastMessageAt: new Date() },
     })
 
-    console.log('✅ Mensagem manual enviada para:', lead.phone)
-    return NextResponse.json({ ok: true })
+    // 3) Envia pelo WhatsApp
+    await sendTextMessage(phone, text.trim())
 
+    return NextResponse.json({ success: true, message })
   } catch (error: any) {
-    console.error('❌ Erro ao enviar mensagem manual:', error.message)
-    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
+    console.error('[POST /api/send-message]', error.message)
+    return NextResponse.json({ error: 'Erro ao enviar mensagem' }, { status: 500 })
   }
 }
