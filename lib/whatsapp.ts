@@ -6,6 +6,7 @@ const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'buzzi123'
 const ZAPI_URL = process.env.WHATSAPP_API_URL // https://api.z-api.io
 const ZAPI_INSTANCE = process.env.WHATSAPP_INSTANCE_ID
 const ZAPI_TOKEN = process.env.WHATSAPP_CLIENT_TOKEN
+const ZAPI_SECURITY_TOKEN = process.env.WHATSAPP_SECURITY_TOKEN // Client-Token de segurança da conta
 
 export async function sendTextMessage(phone: string, text: string) {
   if (!text || text.trim() === '') throw new Error('Texto vazio!')
@@ -23,14 +24,30 @@ async function sendViaZAPI(phone: string, text: string) {
   try {
     const url = `${ZAPI_URL}/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}/send-text`
     const payload = { phone: normalizePhone(phone), message: text }
+    
+    const headers: Record<string, string> = { 
+      'Content-Type': 'application/json' 
+    }
+    
+    // Adiciona o Client-Token se estiver configurado (obrigatório se ativado no painel da Z-API)
+    if (ZAPI_SECURITY_TOKEN) {
+      headers['Client-Token'] = ZAPI_SECURITY_TOKEN
+    }
+
     console.log('📤 Enviando via Z-API:', { phone: payload.phone })
+    
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify(payload),
     })
+    
     const data = await response.json()
-    if (!response.ok) throw new Error(JSON.stringify(data))
+    if (!response.ok) {
+      const errorMsg = data.error || JSON.stringify(data)
+      throw new Error(errorMsg)
+    }
+    
     console.log('✅ Z-API enviou:', data)
     return data
   } catch (error: any) {
