@@ -87,6 +87,21 @@ export async function POST(request: NextRequest) {
     }
 
     const { phone, text } = incomingMessage
+    
+    // Se for uma mensagem outbound (enviada pelo celular), apenas registra no historico
+    if (body.fromMe === true || body.isOutbound === true) {
+      let lead = await prisma.lead.findUnique({ where: { phone } })
+      if (lead) {
+        await prisma.message.create({
+          data: { leadId: lead.id, from: 'agent', text },
+        })
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { lastMessageAt: new Date() },
+        })
+      }
+      return NextResponse.json({ ok: true })
+    }
 
     // 1) Busca ou cria lead
     let lead = await prisma.lead.findUnique({ where: { phone } })
@@ -150,22 +165,34 @@ export async function POST(request: NextRequest) {
 
     // Tenta capturar nome das mensagens do cliente
     if (!updatedBotData.nome) {
-      const IGNORAR = /^(olá|ola|oi|bom dia|boa tarde|boa noite|ok|sim|não|nao|tudo bem|tá|ta|entendi|obrigado|obrigada|claro)$/i
-      const clientMsgs = historyMessages.filter(m => m.from === 'client').map(m => m.text.trim())
+      // Palavras a ignorar: saudações, respostas curtas, nome da IA, e termos da clínica
+      const IGNORAR = /^(olá|ola|oi|bom dia|boa tarde|boa noite|ok|sim|não|nao|tudo bem|tá|ta|entendi|obrigado|obrigada|claro|bia|buzzi|odontologia|clínica|consultório|dra|fernanda)$/i
+      
+      const clientMsgs = historyMessages
+        .filter(m => m.from === 'client')
+        .map(m => m.text.trim())
+        .filter(m => m.length > 0 && m.length < 50) // Filtra mensagens muito longas ou vazias
+      
       for (const msg of clientMsgs) {
         // Padrão explícito: "meu nome é X", "me chamo X"
-        const match = msg.match(/(?:meu nome [eé]|me chamo|sou o|sou a|pode me chamar de)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)/i)
-        if (match) { updatedBotData.nome = match[1]; break }
-        // Mensagem curta que parece um nome (2-4 palavras, sem verbos, sem saudações)
+        const match = msg.match(/(?:meu nome [eé]|me chamo|sou o|sou a|pode me chamar de)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)\b/i)
+        if (match && !IGNORAR.test(match[1])) { 
+          updatedBotData.nome = match[1]
+          break 
+        }
+        
+        // Mensagem curta que parece um nome (2-3 palavras, sem verbos, sem saudações)
         const words = msg.split(' ')
         if (
-          words.length >= 2 &&
-          words.length <= 4 &&
+          words.length >= 1 &&
+          words.length <= 3 &&
           !IGNORAR.test(msg) &&
           /^[A-ZÀ-Ú]/i.test(msg) &&
-          !/[0-9!?.,]/.test(msg)
+          !/[0-9!?.,@#$%&*()\-_+=\[\]{};:'"]/.test(msg) &&
+          msg.length >= 3 && msg.length <= 40
         ) {
-          updatedBotData.nome = msg; break
+          updatedBotData.nome = msg
+          break
         }
       }
     }

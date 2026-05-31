@@ -86,8 +86,25 @@ async function sendViaMeta(phone: string, text: string) {
 
 export function normalizePhone(phone: string): string {
   const cleaned = phone.replace(/\D/g, '')
-  if (cleaned.startsWith('55')) return cleaned
-  return `55${cleaned}`
+  
+  // Garante que começa com 55 (código do Brasil)
+  let normalized = cleaned.startsWith('55') ? cleaned : `55${cleaned}`
+  
+  // Remove o nono dígito se for um número móvel (9 dígitos após o DDD)
+  // Padrão: 55 + DDD (2 dígitos) + 9 + 8 dígitos = 17 dígitos
+  // Queremos: 55 + DDD (2 dígitos) + 8 dígitos = 12 dígitos
+  if (normalized.length === 13) {
+    // Verifica se é um móvel (começa com 9 após o DDD)
+    const ddd = normalized.substring(2, 4)
+    const firstDigit = normalized.substring(4, 5)
+    
+    if (firstDigit === '9') {
+      // Remove o nono dígito (posição 5)
+      normalized = normalized.substring(0, 4) + normalized.substring(5)
+    }
+  }
+  
+  return normalized
 }
 
 export interface IncomingMessage {
