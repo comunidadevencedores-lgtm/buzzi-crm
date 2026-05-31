@@ -101,6 +101,9 @@ async function processBatch(batchId: string, message: string, batchSize: number,
       where: { id: batchId },
       data: { sentCount, failCount },
     })
+
+    if ((i + 1) % batchSize === 0) {
+      await randomDelay(delayMs, delayMs + 2000)
     }
   }
 
