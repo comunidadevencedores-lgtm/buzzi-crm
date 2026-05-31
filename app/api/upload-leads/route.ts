@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
       const existing = await prisma.lead.findFirst({ where: { phone } })
       if (existing) { duplicates++; continue }
       await prisma.lead.create({
-        data: { name: name || phone, phone, email, company, stage: 'Novos', status: 'new', botStep: 'start' },
+        data: { name: name || phone, phone, stage: 'Novos', status: 'new', botStep: 'start' },
       })
       imported++
     }
