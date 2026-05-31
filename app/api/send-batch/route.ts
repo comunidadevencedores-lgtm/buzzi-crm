@@ -20,8 +20,6 @@ export async function POST(request: NextRequest) {
         name: name || `Lote ${new Date().toLocaleDateString('pt-BR')}`,
         message,
         totalLeads: phones.length,
-        batchSize,
-        delayMs,
         status: 'running',
         items: {
           create: phones.map((p: { phone: string; name?: string }) => ({
