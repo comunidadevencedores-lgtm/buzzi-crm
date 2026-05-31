@@ -29,7 +29,6 @@ async function sendViaZAPI(phone: string, text: string) {
       'Content-Type': 'application/json' 
     }
     
-    // Adiciona o Client-Token se estiver configurado (obrigatório se ativado no painel da Z-API)
     if (ZAPI_SECURITY_TOKEN) {
       headers['Client-Token'] = ZAPI_SECURITY_TOKEN
     }
@@ -98,24 +97,47 @@ export interface IncomingMessage {
   timestamp: number
 }
 
+/**
+ * Faz o parse de webhooks tanto da Meta API quanto da Z-API
+ */
 export function parseIncomingWebhook(body: any): IncomingMessage | null {
   try {
     console.log('🔎 DEBUG BODY:', JSON.stringify(body, null, 2))
+
+    // 1. Tenta formato Z-API (mais comum para mensagens recebidas)
+    if (body.phone && (body.text || body.message)) {
+      const text = body.text?.message || body.message || ""
+      if (!text || text.trim() === '') return null
+      
+      return {
+        phone: normalizePhone(String(body.phone)),
+        text: String(text).trim(),
+        messageId: body.messageId || `zapi_${Date.now()}`,
+        timestamp: body.moment || Date.now(),
+      }
+    }
+
+    // 2. Tenta formato Meta API
     const entry = body?.entry?.[0]
     const changes = entry?.changes?.[0]
     const value = changes?.value
     const message = value?.messages?.[0]
-    if (!message) return null
-    if (message.from === META_PHONE_ID) return null
-    const phone = message.from
-    const text = message?.text?.body || null
-    if (!phone || !text || text.trim() === '') return null
-    return {
-      phone: normalizePhone(String(phone)),
-      text: String(text).trim(),
-      messageId: message.id || `msg_${Date.now()}`,
-      timestamp: message.timestamp || Date.now(),
+    
+    if (message) {
+      if (message.from === META_PHONE_ID) return null
+      const phone = message.from
+      const text = message?.text?.body || null
+      if (!phone || !text || text.trim() === '') return null
+      
+      return {
+        phone: normalizePhone(String(phone)),
+        text: String(text).trim(),
+        messageId: message.id || `meta_${Date.now()}`,
+        timestamp: message.timestamp || Date.now(),
+      }
     }
+
+    return null
   } catch (error) {
     console.error('Erro ao parsear webhook:', error)
     return null
