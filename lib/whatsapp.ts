@@ -104,8 +104,14 @@ export function parseIncomingWebhook(body: any): IncomingMessage | null {
   try {
     console.log('🔎 DEBUG BODY:', JSON.stringify(body, null, 2))
 
-    // 1. Tenta formato Z-API (mais comum para mensagens recebidas)
+    // 1. Tenta formato Z-API
     if (body.phone && (body.text || body.message)) {
+      // IGNORA mensagens enviadas pela própria instância para evitar loop
+      if (body.fromMe === true || body.isOutbound === true) {
+        console.log('🚫 Ignorando mensagem enviada pela própria instância (fromMe/isOutbound)')
+        return null
+      }
+
       const text = body.text?.message || body.message || ""
       if (!text || text.trim() === '') return null
       
