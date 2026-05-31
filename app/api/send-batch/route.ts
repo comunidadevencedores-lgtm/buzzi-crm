@@ -101,11 +101,6 @@ async function processBatch(batchId: string, message: string, batchSize: number,
       where: { id: batchId },
       data: { sentCount, failCount },
     })
-
-    await randomDelay(5000, 12000)
-
-    if ((i + 1) % batchSize === 0 && i + 1 < items.length) {
-      await new Promise(r => setTimeout(r, delayMs))
     }
   }
 
