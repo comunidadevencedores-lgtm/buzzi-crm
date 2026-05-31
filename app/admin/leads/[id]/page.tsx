@@ -87,111 +87,144 @@ export default function LeadPage({ params }: { params: { id: string } }) {
 
   if (!lead) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-xl">Carregando...</div>
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="text-4xl mb-4">⏳</div>
+          <p className="text-slate-600">Carregando lead...</p>
+        </div>
       </div>
     )
   }
 
+  const statusMap: Record<string, { label: string; color: string; bg: string }> = {
+    hot:  { label: '🔥 Quente', color: '#dc2626', bg: '#fee2e2' },
+    warm: { label: '☀️ Morno',  color: '#ea580c', bg: '#fed7aa' },
+    cold: { label: '❄️ Frio',   color: '#0369a1', bg: '#cffafe' },
+    new:  { label: '🆕 Novo',   color: '#0891b2', bg: '#ecf0f1' },
+  }
+  const st = statusMap[lead.status] ?? statusMap.new
+
   return (
-    <div className="flex h-screen bg-gray-50">
-      <div className="w-80 bg-white border-r border-gray-200 p-6 overflow-y-auto">
-        <button
-          onClick={() => router.push('/admin/kanban')}
-          className="mb-6 text-blue-600 hover:text-blue-700"
-        >
-          ← Voltar ao Kanban
-        </button>
+    <div className="flex h-full bg-slate-50">
+      {/* Sidebar */}
+      <div className="w-80 bg-white border-r border-slate-200 flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-200">
+          <button
+            onClick={() => router.push('/admin/kanban')}
+            className="mb-4 text-sm text-amber-600 hover:text-amber-700 font-medium flex items-center gap-2"
+          >
+            ← Voltar ao Kanban
+          </button>
+          <h2 className="text-2xl font-bold text-slate-900">{lead.name || 'Sem nome'}</h2>
+          <p className="text-sm text-slate-500 mt-1">{lead.phone}</p>
+        </div>
 
-        <h2 className="text-2xl font-bold mb-4">{lead.name || 'Sem nome'}</h2>
-
-        <div className="space-y-4">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Status */}
           <div>
-            <p className="text-sm text-gray-500">Telefone</p>
-            <p className="font-medium">{lead.phone}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Etapa</p>
-            <p className="font-medium">{lead.stage}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Status</p>
-            <span className={`inline-block px-3 py-1 rounded-full text-sm ${
-              lead.status === 'hot' ? 'bg-red-100 text-red-700' :
-              lead.status === 'warm' ? 'bg-yellow-100 text-yellow-700' :
-              lead.status === 'cold' ? 'bg-blue-100 text-blue-700' :
-              'bg-gray-100 text-gray-700'
-            }`}>
-              {lead.status === 'hot' ? '🔥 Quente' :
-               lead.status === 'warm' ? '☀️ Morno' :
-               lead.status === 'cold' ? '❄️ Frio' : '🆕 Novo'}
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Status</p>
+            <span
+              className="inline-block px-3 py-2 rounded-lg text-sm font-bold"
+              style={{ color: st.color, backgroundColor: st.bg }}
+            >
+              {st.label}
             </span>
           </div>
+
+          {/* Stage */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Etapa</p>
+            <p className="text-sm font-medium text-slate-900">{lead.stage}</p>
+          </div>
+
+          {/* Treatment */}
           {lead.treatment && (
             <div>
-              <p className="text-sm text-gray-500">Tratamento</p>
-              <p className="font-medium">{lead.treatment}</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tratamento</p>
+              <p className="text-sm font-medium text-slate-900">{lead.treatment}</p>
             </div>
           )}
+
+          {/* Bot Data */}
           {lead.botData && Object.keys(lead.botData).length > 0 && (
             <div>
-              <p className="text-sm text-gray-500 mb-2">Dados coletados</p>
-              <div className="bg-gray-50 rounded p-3 space-y-1">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Dados Coletados</p>
+              <div className="space-y-2">
                 {Object.entries(lead.botData).map(([key, value]) => (
-                  <div key={key}>
-                    <span className="text-xs text-gray-500">{key}:</span>
-                    <span className="text-sm ml-2">{String(value)}</span>
+                  <div key={key} className="bg-slate-50 rounded-lg p-3">
+                    <p className="text-xs text-slate-500 mb-1">{key}</p>
+                    <p className="text-sm font-medium text-slate-900">{String(value)}</p>
                   </div>
                 ))}
               </div>
             </div>
           )}
+        </div>
 
-          <div className="pt-4 border-t">
-            <button
-              onClick={toggleBot}
-              className={`w-full py-2 px-4 rounded-lg text-sm font-medium ${
-                botPaused
-                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                  : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-              }`}
-            >
-              {botPaused ? '▶️ Retomar Bot' : '⏸️ Pausar Bot'}
-            </button>
-            <p className="text-xs text-gray-400 mt-1 text-center">
-              {botPaused ? 'Você está no controle' : 'Bot respondendo automaticamente'}
-            </p>
-          </div>
+        {/* Bot Toggle */}
+        <div className="p-6 border-t border-slate-200">
+          <button
+            onClick={toggleBot}
+            className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-all ${
+              botPaused
+                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+            }`}
+          >
+            {botPaused ? '▶️ Retomar Bot' : '⏸️ Pausar Bot'}
+          </button>
+          <p className="text-xs text-slate-500 mt-2 text-center">
+            {botPaused ? 'Você está no controle' : 'Bot respondendo automaticamente'}
+          </p>
         </div>
       </div>
 
+      {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        <div className="bg-white border-b px-6 py-3 flex items-center justify-between">
-          <h3 className="font-semibold">{lead.name || lead.phone}</h3>
-          <span className={`text-xs px-2 py-1 rounded-full ${
-            botPaused ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
-          }`}>
+        {/* Chat Header */}
+        <div className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-slate-900">{lead.name || lead.phone}</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              {new Date(lead.messages[lead.messages.length - 1]?.createdAt || new Date()).toLocaleString('pt-BR')}
+            </p>
+          </div>
+          <span
+            className={`text-xs px-3 py-1 rounded-full font-bold ${
+              botPaused ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
+            }`}
+          >
             {botPaused ? '⏸️ Bot pausado' : '🤖 Bot ativo'}
           </span>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-3">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-8 space-y-4">
           {lead.messages.map((msg) => (
-            <div key={msg.id} className={`flex ${
-              msg.from === 'agent' ? 'justify-end' : 'justify-start'
-            }`}>
-              <div className={`max-w-[70%] rounded-lg p-3 ${
-                msg.from === 'agent' ? 'bg-blue-500 text-white' :
-                msg.from === 'bot' ? 'bg-purple-100 text-purple-900' :
-                'bg-white border border-gray-200 text-gray-900'
-              }`}>
-                <div className="text-xs mb-1 opacity-70">
-                  {msg.from === 'agent' ? '🏥 Você' :
-                   msg.from === 'bot' ? '🤖 Bot' : '👤 Cliente'}
+            <div
+              key={msg.id}
+              className={`flex ${msg.from === 'agent' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-xs rounded-2xl px-4 py-3 ${
+                  msg.from === 'agent'
+                    ? 'bg-amber-500 text-white'
+                    : msg.from === 'bot'
+                    ? 'bg-purple-100 text-purple-900'
+                    : 'bg-slate-100 text-slate-900'
+                }`}
+              >
+                <div className="text-xs mb-1 opacity-70 font-semibold">
+                  {msg.from === 'agent' ? '🏥 Você' : msg.from === 'bot' ? '🤖 Bia' : '👤 Cliente'}
                 </div>
-                <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
-                <p className="text-xs mt-1 opacity-60">
-                  {new Date(msg.createdAt).toLocaleTimeString('pt-BR')}
+                <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                <p className="text-xs mt-2 opacity-60">
+                  {new Date(msg.createdAt).toLocaleTimeString('pt-BR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
                 </p>
               </div>
             </div>
@@ -199,22 +232,23 @@ export default function LeadPage({ params }: { params: { id: string } }) {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="border-t bg-white p-4">
-          <form onSubmit={sendMessage} className="flex gap-2">
+        {/* Input */}
+        <div className="bg-white border-t border-slate-200 p-6">
+          <form onSubmit={sendMessage} className="flex gap-3">
             <input
               type="text"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Digite sua mensagem..."
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm"
+              className="flex-1 px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-sm"
               disabled={sending}
             />
             <button
               type="submit"
               disabled={sending || !message.trim()}
-              className="px-5 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 text-sm"
+              className="px-6 py-3 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-sm font-semibold transition-colors"
             >
-              {sending ? '...' : 'Enviar ✉️'}
+              {sending ? '...' : '📤 Enviar'}
             </button>
           </form>
         </div>
