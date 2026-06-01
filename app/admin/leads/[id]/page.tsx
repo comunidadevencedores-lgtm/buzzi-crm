@@ -22,11 +22,16 @@ interface Lead {
   messages: Message[]
 }
 
+const STAGES = ['Novos', 'Triagem (bot)', 'Em atendimento', 'Orçamento enviado', 'Agendamento pendente', 'Agendado', 'Fechou', 'Perdido']
+
 export default function LeadPage({ params }: { params: { id: string } }) {
   const [lead, setLead] = useState<Lead | null>(null)
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [botPaused, setBotPaused] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [saving, setSaving] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -51,6 +56,37 @@ export default function LeadPage({ params }: { params: { id: string } }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [lead?.messages])
 
+  async function saveName() {
+    if (!nameInput.trim()) return
+    setSaving(true)
+    try {
+      await fetch(`/api/leads/${params.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameInput.trim() }),
+      })
+      setEditingName(false)
+      await fetchLead()
+    } catch {
+      alert('Erro ao salvar nome')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function updateField(field: string, value: string) {
+    try {
+      await fetch(`/api/leads/${params.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      })
+      await fetchLead()
+    } catch {
+      alert('Erro ao atualizar')
+    }
+  }
+
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
     if (!message.trim() || sending) return
@@ -64,7 +100,7 @@ export default function LeadPage({ params }: { params: { id: string } }) {
       if (!res.ok) throw new Error('Erro ao enviar')
       setMessage('')
       await fetchLead()
-    } catch (error) {
+    } catch {
       alert('Erro ao enviar mensagem')
     } finally {
       setSending(false)
@@ -80,7 +116,7 @@ export default function LeadPage({ params }: { params: { id: string } }) {
       })
       setBotPaused(!botPaused)
       await fetchLead()
-    } catch (error) {
+    } catch {
       alert('Erro ao alterar bot')
     }
   }
@@ -108,7 +144,6 @@ export default function LeadPage({ params }: { params: { id: string } }) {
     <div className="flex h-full bg-slate-50">
       {/* Sidebar */}
       <div className="w-80 bg-white border-r border-slate-200 flex flex-col">
-        {/* Header */}
         <div className="p-6 border-b border-slate-200">
           <button
             onClick={() => router.push('/admin/kanban')}
@@ -116,36 +151,84 @@ export default function LeadPage({ params }: { params: { id: string } }) {
           >
             ← Voltar ao Kanban
           </button>
-          <h2 className="text-2xl font-bold text-slate-900">{lead.name || 'Sem nome'}</h2>
+
+          {/* Nome editável */}
+          {editingName ? (
+            <div className="flex gap-2 items-center">
+              <input
+                autoFocus
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false) }}
+                className="flex-1 text-lg font-bold border-b-2 border-amber-500 outline-none bg-transparent text-slate-900 py-1"
+                placeholder="Nome do lead"
+              />
+              <button onClick={saveName} disabled={saving} className="text-xs bg-amber-500 text-white px-2 py-1 rounded font-semibold">
+                {saving ? '...' : '✓'}
+              </button>
+              <button onClick={() => setEditingName(false)} className="text-xs text-slate-400 px-1">✕</button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 group">
+              <h2 className="text-2xl font-bold text-slate-900">{lead.name || 'Sem nome'}</h2>
+              <button
+                onClick={() => { setNameInput(lead.name || ''); setEditingName(true) }}
+                className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-amber-500 transition-all text-sm"
+                title="Editar nome"
+              >
+                ✏️
+              </button>
+            </div>
+          )}
           <p className="text-sm text-slate-500 mt-1">{lead.phone}</p>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Status */}
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Status</p>
-            <span
-              className="inline-block px-3 py-2 rounded-lg text-sm font-bold"
-              style={{ color: st.color, backgroundColor: st.bg }}
+            <select
+              value={lead.status}
+              onChange={e => updateField('status', e.target.value)}
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-amber-500"
             >
-              {st.label}
-            </span>
+              <option value="new">🆕 Novo</option>
+              <option value="cold">❄️ Frio</option>
+              <option value="warm">☀️ Morno</option>
+              <option value="hot">🔥 Quente</option>
+            </select>
           </div>
 
           {/* Stage */}
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Etapa</p>
-            <p className="text-sm font-medium text-slate-900">{lead.stage}</p>
+            <select
+              value={lead.stage}
+              onChange={e => updateField('stage', e.target.value)}
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-amber-500"
+            >
+              {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
 
           {/* Treatment */}
-          {lead.treatment && (
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tratamento</p>
-              <p className="text-sm font-medium text-slate-900">{lead.treatment}</p>
-            </div>
-          )}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tratamento</p>
+            <select
+              value={lead.treatment || ''}
+              onChange={e => updateField('treatment', e.target.value)}
+              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-amber-500"
+            >
+              <option value="">Não definido</option>
+              <option value="Implantes">Implantes</option>
+              <option value="Lentes/Facetas">Lentes/Facetas</option>
+              <option value="Clareamento">Clareamento</option>
+              <option value="Ortodontia">Ortodontia</option>
+              <option value="Prótese">Prótese</option>
+              <option value="Cirurgia">Cirurgia</option>
+              <option value="Consulta geral">Consulta geral</option>
+            </select>
+          </div>
 
           {/* Bot Data */}
           {lead.botData && Object.keys(lead.botData).length > 0 && (
@@ -163,14 +246,11 @@ export default function LeadPage({ params }: { params: { id: string } }) {
           )}
         </div>
 
-        {/* Bot Toggle */}
         <div className="p-6 border-t border-slate-200">
           <button
             onClick={toggleBot}
             className={`w-full py-3 px-4 rounded-lg text-sm font-semibold transition-all ${
-              botPaused
-                ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+              botPaused ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
             }`}
           >
             {botPaused ? '▶️ Retomar Bot' : '⏸️ Pausar Bot'}
@@ -183,7 +263,6 @@ export default function LeadPage({ params }: { params: { id: string } }) {
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        {/* Chat Header */}
         <div className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-slate-900">{lead.name || lead.phone}</h3>
@@ -191,40 +270,23 @@ export default function LeadPage({ params }: { params: { id: string } }) {
               {new Date(lead.messages[lead.messages.length - 1]?.createdAt || new Date()).toLocaleString('pt-BR')}
             </p>
           </div>
-          <span
-            className={`text-xs px-3 py-1 rounded-full font-bold ${
-              botPaused ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'
-            }`}
-          >
+          <span className={`text-xs px-3 py-1 rounded-full font-bold ${botPaused ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'}`}>
             {botPaused ? '⏸️ Bot pausado' : '🤖 Bot ativo'}
           </span>
         </div>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto p-8 space-y-4">
           {lead.messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.from === 'agent' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-xs rounded-2xl px-4 py-3 ${
-                  msg.from === 'agent'
-                    ? 'bg-amber-500 text-white'
-                    : msg.from === 'bot'
-                    ? 'bg-purple-100 text-purple-900'
-                    : 'bg-slate-100 text-slate-900'
-                }`}
-              >
+            <div key={msg.id} className={`flex ${msg.from === 'agent' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs rounded-2xl px-4 py-3 ${
+                msg.from === 'agent' ? 'bg-amber-500 text-white' : msg.from === 'bot' ? 'bg-purple-100 text-purple-900' : 'bg-slate-100 text-slate-900'
+              }`}>
                 <div className="text-xs mb-1 opacity-70 font-semibold">
                   {msg.from === 'agent' ? '🏥 Você' : msg.from === 'bot' ? '🤖 Bia' : '👤 Cliente'}
                 </div>
                 <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
                 <p className="text-xs mt-2 opacity-60">
-                  {new Date(msg.createdAt).toLocaleTimeString('pt-BR', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  {new Date(msg.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
             </div>
@@ -232,7 +294,6 @@ export default function LeadPage({ params }: { params: { id: string } }) {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
         <div className="bg-white border-t border-slate-200 p-6">
           <form onSubmit={sendMessage} className="flex gap-3">
             <input
