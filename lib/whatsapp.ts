@@ -1,102 +1,58 @@
-// lib/whatsapp.ts - Z-API (fallback para Meta se Z-API não configurada)
 const META_TOKEN = process.env.META_WHATSAPP_TOKEN
 const META_PHONE_ID = process.env.META_PHONE_NUMBER_ID
-const META_VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || 'buzzi123'
 
-const ZAPI_URL = process.env.WHATSAPP_API_URL // https://api.z-api.io
+const ZAPI_URL = process.env.WHATSAPP_API_URL
 const ZAPI_INSTANCE = process.env.WHATSAPP_INSTANCE_ID
 const ZAPI_TOKEN = process.env.WHATSAPP_CLIENT_TOKEN
-const ZAPI_SECURITY_TOKEN = process.env.WHATSAPP_SECURITY_TOKEN // Client-Token de segurança da conta
+const ZAPI_SECURITY_TOKEN = process.env.WHATSAPP_SECURITY_TOKEN
+
+export function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  // Garante DDI 55
+  let n = digits.startsWith('55') ? digits : `55${digits}`
+  // Brasil: 55 + DDD(2) + número
+  // Móvel com 8 dígitos após DDD → adiciona o 9
+  if (n.length === 12) n = n.slice(0, 4) + '9' + n.slice(4)
+  return n
+}
 
 export async function sendTextMessage(phone: string, text: string) {
-  if (!text || text.trim() === '') throw new Error('Texto vazio!')
-
-  // Usa Z-API se configurada
-  if (ZAPI_URL && ZAPI_INSTANCE && ZAPI_TOKEN) {
-    return sendViaZAPI(phone, text)
-  }
-
-  // Fallback Meta
+  if (!text?.trim()) throw new Error('Texto vazio!')
+  if (ZAPI_URL && ZAPI_INSTANCE && ZAPI_TOKEN) return sendViaZAPI(phone, text)
   return sendViaMeta(phone, text)
 }
 
 async function sendViaZAPI(phone: string, text: string) {
-  try {
-    const url = `${ZAPI_URL}/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}/send-text`
-    const payload = { phone: normalizePhone(phone), message: text }
-    
-    const headers: Record<string, string> = { 
-      'Content-Type': 'application/json' 
-    }
-    
-    if (ZAPI_SECURITY_TOKEN) {
-      headers['Client-Token'] = ZAPI_SECURITY_TOKEN
-    }
-
-    console.log('📤 Enviando via Z-API:', { phone: payload.phone })
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(payload),
-    })
-    
-    const data = await response.json()
-    if (!response.ok) {
-      const errorMsg = data.error || JSON.stringify(data)
-      throw new Error(errorMsg)
-    }
-    
-    console.log('✅ Z-API enviou:', data)
-    return data
-  } catch (error: any) {
-    console.error('❌ Erro Z-API:', error.message)
-    throw error
-  }
+  const url = `${ZAPI_URL}/instances/${ZAPI_INSTANCE}/token/${ZAPI_TOKEN}/send-text`
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (ZAPI_SECURITY_TOKEN) headers['Client-Token'] = ZAPI_SECURITY_TOKEN
+  console.log('📤 Z-API:', normalizePhone(phone))
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ phone: normalizePhone(phone), message: text }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || JSON.stringify(data))
+  console.log('✅ Z-API ok:', data)
+  return data
 }
 
 async function sendViaMeta(phone: string, text: string) {
-  try {
-    if (!META_TOKEN || !META_PHONE_ID) throw new Error('Variáveis META não configuradas!')
-    const url = `https://graph.facebook.com/v22.0/${META_PHONE_ID}/messages`
-    const payload = {
+  if (!META_TOKEN || !META_PHONE_ID) throw new Error('META não configurado!')
+  const res = await fetch(`https://graph.facebook.com/v22.0/${META_PHONE_ID}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${META_TOKEN}` },
+    body: JSON.stringify({
       messaging_product: 'whatsapp',
       to: normalizePhone(phone),
       type: 'text',
       text: { body: text },
-    }
-    console.log('📤 Enviando para Meta API:', payload)
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${META_TOKEN}`,
-      },
-      body: JSON.stringify(payload),
-    })
-    const data = await response.json()
-    if (!response.ok) throw new Error(JSON.stringify(data))
-    console.log('✅ Meta API enviou:', data)
-    return data
-  } catch (error: any) {
-    console.error('❌ Erro Meta API:', error.message)
-    throw error
-  }
-}
-
-export function normalizePhone(phone: string): string {
-  const cleaned = phone.replace(/\D/g, '')
-  
-  // Garante que começa com 55
-  let normalized = cleaned.startsWith('55') ? cleaned : `55${cleaned}`
-  
-  // Z-API precisa do número COM o nono dígito
-  // Se tiver 12 dígitos (55 + DDD + 8), adiciona o 9
-  if (normalized.length === 12) {
-    normalized = normalized.substring(0, 4) + '9' + normalized.substring(4)
-  }
-  
-  return normalized
+    }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(JSON.stringify(data))
+  return data
 }
 
 export interface IncomingMessage {
@@ -106,55 +62,34 @@ export interface IncomingMessage {
   timestamp: number
 }
 
-/**
- * Faz o parse de webhooks tanto da Meta API quanto da Z-API
- */
 export function parseIncomingWebhook(body: any): IncomingMessage | null {
   try {
-    console.log('🔎 DEBUG BODY:', JSON.stringify(body, null, 2))
-
-    // 1. Tenta formato Z-API
+    // Z-API
     if (body.phone && (body.text || body.message)) {
-      // IGNORA mensagens enviadas pela própria instância para evitar loop
-      if (body.fromMe === true || body.isOutbound === true) {
-        console.log('🚫 Ignorando mensagem enviada pela própria instância (fromMe/isOutbound)')
-        return null
-      }
-
-      const text = body.text?.message || body.message || ""
-      if (!text || text.trim() === '') return null
-      
+      if (body.fromMe === true || body.isOutbound === true) return null
+      const text = body.text?.message || body.message || ''
+      if (!text.trim()) return null
       return {
         phone: normalizePhone(String(body.phone)),
-        text: String(text).trim(),
+        text: text.trim(),
         messageId: body.messageId || `zapi_${Date.now()}`,
         timestamp: body.moment || Date.now(),
       }
     }
-
-    // 2. Tenta formato Meta API
-    const entry = body?.entry?.[0]
-    const changes = entry?.changes?.[0]
-    const value = changes?.value
-    const message = value?.messages?.[0]
-    
+    // Meta
+    const message = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0]
     if (message) {
       if (message.from === META_PHONE_ID) return null
-      const phone = message.from
-      const text = message?.text?.body || null
-      if (!phone || !text || text.trim() === '') return null
-      
+      const text = message?.text?.body
+      if (!message.from || !text?.trim()) return null
       return {
-        phone: normalizePhone(String(phone)),
-        text: String(text).trim(),
+        phone: normalizePhone(String(message.from)),
+        text: text.trim(),
         messageId: message.id || `meta_${Date.now()}`,
         timestamp: message.timestamp || Date.now(),
       }
     }
-
     return null
-  } catch (error) {
-    console.error('Erro ao parsear webhook:', error)
-    return null
-  }
-}
+  } catch (e) {
+    console.error('parseIncomingWebhook erro:', e)
+    retu
