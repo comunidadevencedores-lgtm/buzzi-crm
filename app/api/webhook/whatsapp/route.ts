@@ -165,21 +165,21 @@ export async function POST(request: NextRequest) {
 
     // Tenta capturar nome das mensagens do cliente
     if (!updatedBotData.nome) {
-      // Palavras a ignorar: saudações, respostas curtas, nome da IA, e termos da clínica
-      const IGNORAR = /^(olá|ola|oi|bom dia|boa tarde|boa noite|ok|sim|não|nao|tudo bem|tá|ta|entendi|obrigado|obrigada|claro|bia|buzzi|odontologia|clínica|consultório|dra|fernanda)$/i
-      
-      const clientMsgs = historyMessages
-        .filter(m => m.from === 'client')
-        .map(m => m.text.trim())
-        .filter(m => m.length > 0 && m.length < 50) // Filtra mensagens muito longas ou vazias
-      
-      for (const msg of clientMsgs) {
-        // Padrão explícito: "meu nome é X", "me chamo X"
-        const match = msg.match(/(?:meu nome [eé]|me chamo|sou o|sou a|pode me chamar de)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)\b/i)
-        if (match && !IGNORAR.test(match[1])) { 
-          updatedBotData.nome = match[1]
-          break 
-        }
+  const IGNORAR = /^(olá|ola|oi|bom dia|boa tarde|boa noite|ok|sim|não|nao|tudo|tá|ta|entendi|obrigado|obrigada|claro|bia|buzzi|odontologia|clínica|consultório|dra|fernanda|quero|gostaria|preciso|tenho|pode|seria|qual|quando|como|onde|info|informação|informacoes|agendar|consulta|dúvida|duvida|ajuda|atendimento|ola|oi|oi!|olá!)$/i
+  
+  const clientMsgs = historyMessages
+    .filter(m => m.from === 'client')
+    .map(m => m.text.trim())
+  
+  for (const msg of clientMsgs) {
+    // Padrão explícito: "meu nome é X"
+    const match = msg.match(/(?:meu nome [eé]|me chamo|sou o|sou a|pode me chamar de)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)\b/i)
+    if (match && !IGNORAR.test(match[1].trim())) { 
+      updatedBotData.nome = match[1]
+      break 
+    }
+  }
+}
         
         // Mensagem curta que parece um nome (2-3 palavras, sem verbos, sem saudações)
         const words = msg.split(' ')
