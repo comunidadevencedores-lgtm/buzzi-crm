@@ -1,17 +1,11 @@
 'use client'
-
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const pathname = usePathname()
-
   const isActive = (path: string) => pathname.includes(path)
 
   const navItems = [
@@ -24,21 +18,17 @@ export default function AdminLayout({
   return (
     <div className="flex h-screen bg-slate-50">
       {/* Sidebar */}
-      <div
-        className={`${
-          sidebarOpen ? 'w-64' : 'w-20'
-        } bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-all duration-300 flex flex-col border-r border-slate-700`}
-      >
+      <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-slate-900 to-slate-800 text-white transition-all duration-300 flex flex-col border-r border-slate-700`}>
         {/* Logo */}
         <div className="p-6 border-b border-slate-700">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center font-bold text-slate-900">
-              B
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center font-bold text-white text-sm">
+              FL
             </div>
             {sidebarOpen && (
               <div>
-                <div className="font-bold text-sm">Buzzi CRM</div>
-                <div className="text-xs text-slate-400">Odontologia</div>
+                <div className="font-bold text-sm">FLIP CRM</div>
+                <div className="text-xs text-slate-400">Prospecção & Atendimento</div>
               </div>
             )}
           </div>
@@ -52,7 +42,7 @@ export default function AdminLayout({
               href={item.path}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                 isActive(item.path)
-                  ? 'bg-amber-500 text-white shadow-lg'
+                  ? 'bg-orange-500 text-white shadow-lg'
                   : 'text-slate-300 hover:bg-slate-700'
               }`}
             >
@@ -62,12 +52,11 @@ export default function AdminLayout({
           ))}
         </nav>
 
-        {/* Toggle Button */}
+        {/* Toggle */}
         <div className="p-3 border-t border-slate-700">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="w-full p-2 rounded-lg hover:bg-slate-700 transition-colors"
-            title={sidebarOpen ? 'Recolher' : 'Expandir'}
           >
             <span className="text-lg">{sidebarOpen ? '◀️' : '▶️'}</span>
           </button>
@@ -79,17 +68,17 @@ export default function AdminLayout({
         {/* Top Bar */}
         <div className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between shadow-sm">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Buzzi CRM</h1>
-            <p className="text-sm text-slate-500">Gerenciador de Leads com IA</p>
+            <h1 className="text-2xl font-bold text-slate-900">FLIP CRM</h1>
+            <p className="text-sm text-slate-500">Prospecção & Atendimento Inteligente</p>
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center font-bold text-slate-900">
-              FB
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center font-bold text-white text-sm">
+              FL
             </div>
           </div>
         </div>
 
-        {/* Content Area */}
+        {/* Content */}
         <div className="flex-1 overflow-auto">
           {children}
         </div>
