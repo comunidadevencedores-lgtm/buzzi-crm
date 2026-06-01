@@ -164,19 +164,20 @@ export async function POST(request: NextRequest) {
     )
 
     // Tenta capturar nome das mensagens do cliente
-    if (!updatedBotData.nome) {
-  const IGNORAR = /^(olá|ola|oi|bom dia|boa tarde|boa noite|ok|sim|não|nao|tudo|tá|ta|entendi|obrigado|obrigada|claro|bia|buzzi|odontologia|clínica|consultório|dra|fernanda|quero|gostaria|preciso|tenho|pode|seria|qual|quando|como|onde|info|informação|informacoes|agendar|consulta|dúvida|duvida|ajuda|atendimento|ola|oi|oi!|olá!)$/i
-  
+    // Captura nome SOMENTE por padrão explícito — nunca pela primeira mensagem
+if (!updatedBotData.nome) {
+  const IGNORAR = /^(olá|ola|oi|bom dia|boa tarde|boa noite|ok|sim|não|nao|tudo|tá|ta|entendi|obrigado|obrigada|claro|bia|buzzi|odontologia|clínica|consultório|dra|fernanda|quero|gostaria|preciso|tenho|pode|seria|qual|quando|como|onde|info|informação|agendar|consulta|dúvida|duvida|ajuda|atendimento|opa|vão|vao|e aí|eai|salve|hey|hello)$/i
+
   const clientMsgs = historyMessages
     .filter(m => m.from === 'client')
     .map(m => m.text.trim())
-  
+
   for (const msg of clientMsgs) {
-    // Padrão explícito: "meu nome é X"
+    // SOMENTE captura nome se o cliente disser explicitamente
     const match = msg.match(/(?:meu nome [eé]|me chamo|sou o|sou a|pode me chamar de)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)\b/i)
-    if (match && !IGNORAR.test(match[1].trim())) { 
+    if (match && !IGNORAR.test(match[1].trim())) {
       updatedBotData.nome = match[1]
-      break 
+      break
     }
   }
 }
