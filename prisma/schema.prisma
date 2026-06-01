@@ -90,3 +90,8 @@ model BatchDispatchItem {
   sentAt  DateTime?
   error   String?
 }
+model Config {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
