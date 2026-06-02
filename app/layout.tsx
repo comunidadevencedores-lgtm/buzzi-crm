@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Buzzi CRM - WhatsApp',
-  description: 'Sistema de CRM com integração WhatsApp',
+  title: 'FLIP CRM',
+  description: 'Prospecção & Atendimento Inteligente com IA',
 }
 
 export default function RootLayout({
